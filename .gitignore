@@ -1,0 +1,35 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Local user data / model artifacts
+data/private/
+data/uploads/
+models/
+*.pt
+*.pth
+*.safetensors
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Planning / specification markdown files (only README.md is tracked/posted)
+*.md
+!README.md
+docs/
+reports/
+

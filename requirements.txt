@@ -1,0 +1,7 @@
+# Core runtime dependencies for ResearchPaper Lens (College MVP)
+# Python 3.11.x baseline
+streamlit>=1.30.0
+pypdf>=4.0.0
+scikit-learn>=1.4.0
+networkx>=3.2.0
+numpy>=1.26.0
