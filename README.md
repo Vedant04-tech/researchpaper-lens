@@ -117,11 +117,11 @@ Expected output: **54 passed unit tests**.
 ## 📊 Mathematical Foundations
 
 - **TF-IDF Term Weighting:**
-  $$\operatorname{tfidf}(t, d) = \operatorname{tf}(t, d) \times \left(\log\left(\frac{1 + N}{1 + \operatorname{df}(t)}\right) + 1\right)$$
+  $$\text{tfidf}(t, d) = \text{tf}(t, d) \times \left(\log\left(\frac{1 + N}{1 + \text{df}(t)}\right) + 1\right)$$
 - **Cosine Similarity:**
-  $$\operatorname{cos}(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|_2 \|\mathbf{v}\|_2}$$
+  $$\cos(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|_2 \|\mathbf{v}\|_2}$$
 - **PageRank Vertex Centrality:**
-  $$R_i = \frac{1 - d}{n} + d \sum_{j \in \operatorname{In}(i)} \frac{w_{ji}}{\sum_{k \in \operatorname{Out}(j)} w_{jk}} R_j$$
+  $$R_i = \frac{1 - d}{n} + d \sum_{j \in \text{In}(i)} \frac{w_{ji}}{\sum_{k \in \text{Out}(j)} w_{jk}} R_j$$
   *(Damping factor $d = 0.85$, max iterations $= 100$, tolerance $= 10^{-6}$)*
 
 ---
