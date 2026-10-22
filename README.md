@@ -34,6 +34,10 @@
 8. **Interactive Streamlit Workspace** (`app.py`)
    - Calm, editorial research workspace adhering to `design.md`.
    - Real-time compression metrics, side-by-side baseline comparisons, instant passage search, and one-click markdown/text exports.
+9. **Abstractive Synthesis & Pluggable Adapter (Phase 6)** (`src/abstractive.py`)
+   - Pluggable abstractive summarization supporting offline deterministic simulation, Hugging Face Inference API (`facebook/bart-large-cnn`), and OpenAI-compatible endpoints (`gpt-3.5-turbo`, Groq, or local Ollama).
+   - "Extractive-then-Abstractive" pipeline feeding TextRank output into generative models to respect token limits.
+   - Resilient error handling (graceful timeout/key failure fallbacks), privacy disclosures, and explicit model-attribution badges.
 
 ---
 
@@ -60,7 +64,8 @@ ResearchPaper-Lens/
 │   ├── retrieval.py             # Passage grouping & TF-IDF cosine search
 │   ├── keywords.py              # Sentence-level TF-IDF keyword extraction
 │   ├── baselines.py             # Lead-k, word-frequency, and keyword-match baselines
-│   └── evaluation.py            # Precision@k, MRR, compression ratio, ROUGE-n
+│   ├── evaluation.py            # Precision@k, MRR, compression ratio, ROUGE-n
+│   └── abstractive.py           # Pluggable abstractive adapter (Mock, HF, OpenAI/Ollama)
 ├── tests/
 │   ├── test_smoke.py            # Smoke tests verifying dependency imports
 │   ├── test_extract.py          # 10 unit tests covering extraction contracts
@@ -70,6 +75,7 @@ ResearchPaper-Lens/
 │   ├── test_keywords.py         # 5 unit tests covering keyword extraction
 │   ├── test_baselines.py        # 6 unit tests covering academic baselines
 │   ├── test_evaluation.py       # 7 unit tests covering IR & summarization metrics
+│   ├── test_abstractive.py      # 12 unit tests covering abstractive synthesis adapters
 │   └── fixtures/                # Synthetic test document fixtures
 └── reports/
     ├── report-outline.md        # Academic report structure for college viva
@@ -110,7 +116,7 @@ The application will open in your browser at `http://localhost:8501`.
 ```bash
 pytest
 ```
-Expected output: **54 passed unit tests**.
+Expected output: **66 passed unit tests**.
 
 ---
 

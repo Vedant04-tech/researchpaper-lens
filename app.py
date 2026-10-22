@@ -11,6 +11,15 @@ from typing import Optional
 
 import streamlit as st
 
+from src.abstractive import (
+    DEFAULT_HF_MODEL,
+    DEFAULT_OPENAI_MODEL,
+    AbstractiveError,
+    AbstractiveResult,
+    MissingApiKeyError,
+    ModelTimeoutError,
+    summarize_abstractive,
+)
 from src.baselines import (
     keyword_match_retrieve,
     lead_k_summarize,
@@ -111,6 +120,28 @@ st.markdown(
         margin-right: 0.4rem;
         margin-bottom: 0.4rem;
     }
+    .model-badge {
+        display: inline-block;
+        background-color: #ECFDF5;
+        color: #047857;
+        border: 1px solid #A7F3D0;
+        padding: 0.35rem 0.85rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.8rem;
+    }
+    .privacy-box {
+        background-color: #FFFBEB;
+        border: 1px solid #FCD34D;
+        border-left: 4px solid #F59E0B;
+        border-radius: 6px;
+        padding: 0.85rem 1.1rem;
+        margin-bottom: 1.2rem;
+        font-size: 0.9rem;
+        color: #92400E;
+        line-height: 1.5;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -196,19 +227,24 @@ def main() -> None:
         st.warning("⚠️ No valid sentences detected in the document content body.")
         return
 
+    # Precompute TextRank summary so both Extractive and Abstractive tabs can access it
+    with st.spinner("Computing PageRank over sentence-similarity graph..."):
+        textrank_res = textrank_summarize(prep_doc.sentences, ratio=summary_ratio)
+
     # Main Application Tabs
-    tab_summary, tab_retrieval, tab_keywords, tab_canonical = st.tabs(
+    tab_summary, tab_retrieval, tab_keywords, tab_canonical, tab_abstractive = st.tabs(
         [
             "📝 Extractive Summary (TextRank)",
             "🔍 Passage Retrieval (TF-IDF)",
             "🏷️ Salient Keywords",
             "📖 Canonical Source Text",
+            "✨ Abstractive Synthesis (Phase 6)",
         ]
     )
 
     # 1. Extractive Summary Tab
     with tab_summary:
-        render_summary_tab(prep_doc, summary_ratio, show_baselines)
+        render_summary_tab(prep_doc, summary_ratio, show_baselines, textrank_res)
 
     # 2. Passage Retrieval Tab
     with tab_retrieval:
@@ -221,6 +257,10 @@ def main() -> None:
     # 4. Canonical Source Text Tab
     with tab_canonical:
         render_canonical_tab(extraction, prep_doc)
+
+    # 5. Abstractive Synthesis Tab (Phase 6)
+    with tab_abstractive:
+        render_abstractive_tab(prep_doc, textrank_res.summary)
 
 
 def render_welcome_state() -> None:
@@ -276,11 +316,10 @@ def render_metadata_banner(extraction, prep_doc) -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
 
-def render_summary_tab(prep_doc, summary_ratio: float, show_baselines: bool) -> None:
+def render_summary_tab(
+    prep_doc, summary_ratio: float, show_baselines: bool, textrank_res
+) -> None:
     st.subheader("TextRank Extractive Summary")
-
-    with st.spinner("Computing PageRank over sentence-similarity graph..."):
-        textrank_res = textrank_summarize(prep_doc.sentences, ratio=summary_ratio)
 
     summary_words = len(textrank_res.summary.split())
     comp_ratio = (
@@ -427,6 +466,211 @@ def render_canonical_tab(extraction, prep_doc) -> None:
         st.markdown("**References / Bibliography (Isolated)**")
         ref_text = prep_doc.references_text or "No References section separated."
         st.text_area("References", value=ref_text, height=350)
+
+
+def render_abstractive_tab(prep_doc, textrank_summary: str) -> None:
+    st.subheader("Abstractive Synthesis & Model Adaptation (Phase 6)")
+    st.caption(
+        "Abstractive summarization synthesizes and paraphrases key concepts in novel prose, "
+        "providing a complementary alternative to extractive sentence selection."
+    )
+
+    # Privacy & Cost Disclosure Box
+    st.markdown(
+        """
+        <div class="privacy-box">
+            <strong>🔒 Privacy & Data Transfer Policy:</strong><br>
+            When utilizing hosted cloud inference (Hugging Face or OpenAI), document excerpts are transmitted
+            over HTTPS to external API endpoints. For confidential papers or zero-cost offline exploration,
+            select <strong>Mock / Demo Mode (Offline)</strong> or connect to a local Ollama instance.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c_prov, c_source = st.columns([1, 1])
+    with c_prov:
+        provider_choice = st.radio(
+            "Inference Provider",
+            options=[
+                "Mock / Demo Mode (Offline)",
+                "Hugging Face Inference API",
+                "OpenAI / Ollama (v1-Compatible)",
+            ],
+            index=0,
+            help="Choose between zero-cost offline simulation or hosted deep learning models.",
+        )
+    with c_source:
+        pipeline_strategy = st.radio(
+            "Pipeline Input Strategy",
+            options=[
+                "Extractive-then-Abstractive (Synthesize TextRank output)",
+                "Raw Document Excerpt (First 4,000 characters)",
+            ],
+            index=0,
+            help="Extractive-then-Abstractive filters dense academic text into salient points first, fitting standard 1024-token model windows.",
+        )
+
+    api_key = ""
+    model_id = ""
+    base_url = "https://api.openai.com/v1"
+    provider_key = "mock"
+
+    if provider_choice == "Mock / Demo Mode (Offline)":
+        st.info(
+            "💡 **Mock Mode Active:** Generates an executive synthesis deterministically without network calls, API keys, or latency."
+        )
+        model_id = "mock-abstractive-v1"
+        provider_key = "mock"
+    elif provider_choice == "Hugging Face Inference API":
+        c_k, c_m = st.columns([1, 1])
+        with c_k:
+            api_key = st.text_input(
+                "Hugging Face API Token",
+                type="password",
+                placeholder="hf_...",
+                help="Requires a free or paid Hugging Face User Access Token.",
+            )
+        with c_m:
+            model_id = st.text_input(
+                "Model Identifier",
+                value=DEFAULT_HF_MODEL,
+                help="HF summarization model e.g. facebook/bart-large-cnn or google/pegasus-xsum.",
+            )
+        provider_key = "huggingface"
+    else:  # OpenAI / Ollama
+        c_k, c_m, c_u = st.columns([1, 1, 1])
+        with c_k:
+            api_key = st.text_input(
+                "API Key",
+                type="password",
+                placeholder="sk-... (or 'dummy' for Ollama)",
+                help="API key for OpenAI / Groq, or dummy string if using a local Ollama server.",
+            )
+        with c_m:
+            model_id = st.text_input(
+                "Model Identifier",
+                value=DEFAULT_OPENAI_MODEL,
+                help="e.g. gpt-3.5-turbo, gpt-4o-mini, llama3:8b, mistral",
+            )
+        with c_u:
+            base_url = st.text_input(
+                "Base URL",
+                value="https://api.openai.com/v1",
+                help="API endpoint URL. For local Ollama, use http://localhost:11434/v1.",
+            )
+        provider_key = "openai"
+
+    if st.button("🚀 Generate Abstractive Summary", type="primary"):
+        if "Extractive-then-Abstractive" in pipeline_strategy:
+            target_input = textrank_summary
+        else:
+            target_input = prep_doc.cleaned_text[:4000]
+
+        if not target_input.strip():
+            st.warning("⚠️ Input text is empty. Cannot synthesize summary.")
+            return
+
+        with st.spinner(f"Requesting abstractive synthesis via {provider_choice}..."):
+            try:
+                res = summarize_abstractive(
+                    text=target_input,
+                    provider=provider_key,
+                    api_key=api_key,
+                    model=model_id,
+                    base_url=base_url,
+                )
+                st.session_state["abstractive_result"] = res
+            except MissingApiKeyError as e:
+                st.error(f"🔑 Missing API Key: {e}")
+            except ModelTimeoutError as e:
+                st.error(f"⏱️ Model Request Timeout: {e}")
+            except AbstractiveError as e:
+                st.error(f"❌ Abstractive Synthesis Failure: {e}")
+            except Exception as e:
+                st.error(f"❌ Unexpected Error: {e}")
+
+    # Render persisted summary if present in session state
+    if "abstractive_result" in st.session_state:
+        res: AbstractiveResult = st.session_state["abstractive_result"]
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="model-badge">🤖 Model-Generated Output &nbsp;|&nbsp; '
+            f'Model: <code>{res.model_name}</code> &nbsp;|&nbsp; '
+            f'Provider: <code>{res.provider}</code> &nbsp;|&nbsp; '
+            f'Latency: {res.latency_seconds:.3f}s</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.text_area(
+            "Abstractive Synthesis Output",
+            value=res.summary,
+            height=200,
+            help="Synthesized text generated by deep learning model. Rephrased from source content.",
+        )
+
+        abs_words = len(res.summary.split())
+        abs_comp = (abs_words / prep_doc.word_count * 100) if prep_doc.word_count > 0 else 0
+        st.caption(
+            f"Synthesized **{abs_words}** words (**{abs_comp:.1f}%** compression ratio from {prep_doc.word_count} total words)."
+        )
+
+        # Download Abstractive Summary
+        abs_download_md = (
+            f"# ResearchPaper Lens — Abstractive Summary\n\n"
+            f"- **Method:** Abstractive Synthesis ({res.provider})\n"
+            f"- **Model Identifier:** `{res.model_name}`\n"
+            f"- **Inference Latency:** {res.latency_seconds:.3f} seconds\n"
+            f"- **Compression Ratio:** {abs_comp:.1f}% ({abs_words} words)\n"
+            f"- **Attribution Note:** Synthesized deep-learning output; verified non-verbatim.\n\n"
+            f"## Synthesized Summary\n\n{res.summary}\n"
+        )
+        st.download_button(
+            label="📥 Download Abstractive Summary (.md)",
+            data=abs_download_md,
+            file_name="abstractive_summary.md",
+            mime="text/markdown",
+            key="btn_dl_abs",
+        )
+
+        # Comparative Analysis: Extractive vs Abstractive
+        st.divider()
+        st.markdown("### ⚖️ Extractive vs. Abstractive Comparison")
+        st.caption("Juxtaposition of graph-based extraction against neural generative synthesis.")
+
+        comp_col1, comp_col2 = st.columns(2)
+        with comp_col1:
+            st.markdown("#### 1. TextRank Extractive Output")
+            st.text_area(
+                "Verbatim Source Sentences",
+                value=textrank_summary,
+                height=180,
+                key="ext_comp_view",
+            )
+            ext_words = len(textrank_summary.split())
+            st.caption(f"Length: **{ext_words} words** | Faithfulness: **100% verbatim**")
+
+        with comp_col2:
+            st.markdown("#### 2. Abstractive Synthesis Output")
+            st.text_area(
+                "Synthesized Novel Prose",
+                value=res.summary,
+                height=180,
+                key="abs_comp_view",
+            )
+            st.caption(f"Length: **{abs_words} words** | Faithfulness: **Paraphrased by model**")
+
+        st.markdown(
+            """
+| Dimension | TextRank Extractive | Abstractive Synthesis |
+| :--- | :--- | :--- |
+| **Generation Mechanism** | Graph centrality (PageRank over TF-IDF cosine similarities) | Sequence-to-sequence neural generation (BART / Transformers) |
+| **Vocabulary Source** | Verbatim from source document | Generates novel vocabulary and connecting transitions |
+| **Hallucination Risk** | **Zero** (no novel facts can be invented) | **Low to Moderate** (depends on model temperature and grounding) |
+| **Computational Footprint** | Pure CPU ($O(V^2)$ cosine matrix, fast PageRank convergence) | High GPU/TPU memory or network API dependency |
+| **Token Limit Constraint** | Unconstrained (scales linearly across document passages) | Limited by model context window (typically 1024–4096 tokens) |
+"""
+        )
 
 
 if __name__ == "__main__":
