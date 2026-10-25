@@ -7,6 +7,8 @@ Adheres strictly to design.md, architecture.md, and prd.md.
 from __future__ import annotations
 
 import io
+import os
+from pathlib import Path
 from typing import Optional
 
 import streamlit as st
@@ -26,6 +28,8 @@ from src.baselines import (
     word_frequency_summarize,
 )
 from src.extract import (
+    CorruptDocumentError,
+    DecompressionBombError,
     EmptyDocumentError,
     ExtractionError,
     FileTooLargeError,
@@ -35,6 +39,12 @@ from src.extract import (
 )
 from src.keywords import extract_keywords
 from src.preprocess import preprocess_document
+from src.privacy import redact_sensitive_text
+from src.report import (
+    build_analysis_report,
+    export_report_json,
+    export_report_pdf,
+)
 from src.retrieval import PassageRetrievalIndex
 from src.textrank import DEFAULT_SUMMARY_RATIO, textrank_summarize
 
@@ -52,9 +62,9 @@ st.markdown(
     <style>
     /* Primary typography & container spacing */
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.8rem;
         padding-bottom: 3rem;
-        max-width: 1200px;
+        max-width: 1250px;
     }
     .main-header {
         font-size: 2.1rem;
@@ -66,27 +76,56 @@ st.markdown(
     .sub-header {
         font-size: 1.05rem;
         color: #526174;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.2rem;
     }
     /* Stat cards */
     .stat-box {
         background-color: #FFFFFF;
         border: 1px solid #D8E0E9;
         border-radius: 8px;
-        padding: 1rem;
+        padding: 0.9rem;
         text-align: center;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
     .stat-val {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         font-weight: 700;
         color: #285D9A;
     }
     .stat-label {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         color: #526174;
         text-transform: uppercase;
         letter-spacing: 0.04em;
+    }
+    /* Hash identity bar */
+    .integrity-container {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 0.85rem 1.1rem;
+        margin-bottom: 1rem;
+    }
+    .hash-badge {
+        display: inline-block;
+        background-color: #EDE9FE;
+        color: #5B21B6;
+        font-family: monospace;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        margin-right: 0.5rem;
+    }
+    .review-cue-box {
+        background-color: #F0FDF4;
+        border: 1px solid #BBF7D0;
+        border-left: 4px solid #16A34A;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.88rem;
+        color: #166534;
+        line-height: 1.45;
     }
     /* Passage search cards */
     .passage-card {
@@ -147,21 +186,53 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+PRESETS = {
+    "-- Custom File Upload --": None,
+    "Sample 1: Clean Baseline (Attention & Transformers)": "fixtures/sample_01_clean_baseline.txt",
+    "Sample 2: Multi-Section Paper with References (GNNs)": "fixtures/sample_02_metadata_rich.txt",
+    "Sample 3: Edge-Case Math, Abbreviations & Hyphens": "fixtures/sample_03_edge_case_math.txt",
+    "Sample 4: Academic PDF Publication (Unified TextRank)": "fixtures/sample_05_academic_paper.pdf",
+    "Sample 5: Corrupted / Malformed Bitstream (Stress Demo)": "fixtures/sample_04_corrupted.pdf",
+}
+
 
 def main() -> None:
-    st.markdown('<div class="main-header">ResearchPaper Lens</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">ResearchPaper Lens 📄</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sub-header">Explainable document summarization and Information Retrieval for academic papers.</div>',
+        '<div class="sub-header">Explainable Document Summarization & Information Retrieval for Research Papers</div>',
         unsafe_allow_html=True,
     )
 
-    # Sidebar: Document Upload & Algorithm Controls
+    # Sidebar: Document Ingestion & Sample Presets
     st.sidebar.header("📁 Document Ingestion")
-    uploaded_file = st.sidebar.file_uploader(
-        "Upload PDF or TXT file (Max 10 MiB)",
-        type=["pdf", "txt"],
-        help="Upload a research paper or technical document. PDFs are processed with pypdf.",
+
+    selected_preset = st.sidebar.selectbox(
+        "Standardized Sample Presets",
+        options=list(PRESETS.keys()),
+        index=0,
+        help="Select a standardized fixture for 1-click evaluation, viva demonstration, or edge-case stress testing.",
     )
+
+    uploaded_file = None
+    file_bytes: bytes | None = None
+    filename: str = ""
+
+    if selected_preset != "-- Custom File Upload --":
+        preset_path = PRESETS[selected_preset]
+        if preset_path and os.path.exists(preset_path):
+            with open(preset_path, "rb") as f:
+                file_bytes = f.read()
+            filename = os.path.basename(preset_path)
+            st.sidebar.success(f"Loaded: `{filename}` ({len(file_bytes):,} bytes)")
+    else:
+        uploaded_file = st.sidebar.file_uploader(
+            "Upload PDF or TXT file (Max 10 MiB)",
+            type=["pdf", "txt"],
+            help="Upload a research paper or technical document. PDFs are processed permissively with pypdf.",
+        )
+        if uploaded_file is not None:
+            file_bytes = uploaded_file.getvalue()
+            filename = uploaded_file.name
 
     st.sidebar.divider()
     st.sidebar.header("⚙️ Algorithm Controls")
@@ -189,22 +260,39 @@ def main() -> None:
         help="Compare TextRank with Lead-k and Word-Frequency; compare TF-IDF with Keyword Matching.",
     )
 
-    if uploaded_file is None:
+    apply_privacy = st.sidebar.checkbox(
+        "🔒 Privacy-by-Default Filtering",
+        value=True,
+        help="Automatically mask emails, phone numbers, and credentials in previews and reports.",
+    )
+
+    if st.sidebar.button("🔄 Reset Session", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+    if file_bytes is None or not filename:
         render_welcome_state()
         return
 
     # Ingestion & Extraction Phase
     try:
         with st.spinner("Extracting canonical text from document..."):
-            extraction = extract_text(uploaded_file, filename=uploaded_file.name)
+            extraction = extract_text(file_bytes, filename=filename)
+    except EmptyDocumentError as e:
+        st.error(f"⚠️ Empty document: {e}")
+        return
+    except CorruptDocumentError as e:
+        st.error(f"❌ Corrupt document bitstream: {e}")
+        return
+    except DecompressionBombError as e:
+        st.error(f"💣 Decompression bomb alert: {e}")
+        return
     except FileTooLargeError as e:
         st.error(f"❌ File too large: {e}")
         return
     except PageLimitExceededError as e:
         st.error(f"❌ Page limit exceeded: {e}")
-        return
-    except EmptyDocumentError as e:
-        st.error(f"⚠️ Empty document: {e}")
         return
     except UnsupportedFormatError as e:
         st.error(f"❌ Unsupported format: {e}")
@@ -220,16 +308,56 @@ def main() -> None:
     with st.spinner("Normalizing text and segmenting sentences..."):
         prep_doc = preprocess_document(extraction.text)
 
-    # Display document metadata banner and warnings
-    render_metadata_banner(extraction, prep_doc)
+    # Display cryptographic evidence and container properties
+    render_integrity_and_metadata_banner(extraction, prep_doc, apply_privacy)
 
     if not prep_doc.sentences:
         st.warning("⚠️ No valid sentences detected in the document content body.")
         return
 
-    # Precompute TextRank summary so both Extractive and Abstractive tabs can access it
+    # Precompute TextRank summary and baselines
     with st.spinner("Computing PageRank over sentence-similarity graph..."):
         textrank_res = textrank_summarize(prep_doc.sentences, ratio=summary_ratio)
+        lead_res = lead_k_summarize(prep_doc.sentences, ratio=summary_ratio)
+        freq_res = word_frequency_summarize(prep_doc.sentences, ratio=summary_ratio)
+        keywords_res = extract_keywords(prep_doc.sentences, count=15)
+
+    # Dual-Format Export Bar (PDF & JSON)
+    report_obj = build_analysis_report(
+        extraction_res=extraction,
+        prep_doc=prep_doc,
+        textrank_res=textrank_res,
+        summary_ratio=summary_ratio,
+        lead_res=lead_res,
+        freq_res=freq_res,
+        keywords_list=keywords_res,
+        abstractive_res=st.session_state.get("abstractive_result"),
+        apply_privacy=apply_privacy,
+    )
+
+    col_exp_1, col_exp_2 = st.columns(2)
+    with col_exp_1:
+        pdf_bytes = export_report_pdf(report_obj)
+        st.download_button(
+            label="📄 Download Forensic PDF Report",
+            data=pdf_bytes,
+            file_name=f"{Path(extraction.filename).stem}_forensic_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            help="Generate publication-grade PDF report with cryptographic digests, explainable cues, and tables.",
+        )
+    with col_exp_2:
+        json_str = export_report_json(report_obj)
+        st.download_button(
+            label="📦 Download Structured JSON Report",
+            data=json_str,
+            file_name=f"{Path(extraction.filename).stem}_report.json",
+            mime="application/json",
+            use_container_width=True,
+            help="Export machine-readable JSON schema report.",
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # Main Application Tabs
     tab_summary, tab_retrieval, tab_keywords, tab_canonical, tab_abstractive = st.tabs(
@@ -244,7 +372,7 @@ def main() -> None:
 
     # 1. Extractive Summary Tab
     with tab_summary:
-        render_summary_tab(prep_doc, summary_ratio, show_baselines, textrank_res)
+        render_summary_tab(prep_doc, summary_ratio, show_baselines, textrank_res, lead_res, freq_res)
 
     # 2. Passage Retrieval Tab
     with tab_retrieval:
@@ -252,7 +380,7 @@ def main() -> None:
 
     # 3. Keywords & Analytics Tab
     with tab_keywords:
-        render_keywords_tab(prep_doc)
+        render_keywords_tab(prep_doc, keywords_res)
 
     # 4. Canonical Source Text Tab
     with tab_canonical:
@@ -265,7 +393,7 @@ def main() -> None:
 
 def render_welcome_state() -> None:
     st.info(
-        "👋 **Welcome to ResearchPaper Lens.** To begin analysis, upload a research paper (.pdf) or text notes (.txt) using the sidebar."
+        "👋 **Welcome to ResearchPaper Lens.** Choose a preset sample from the sidebar dropdown or upload your own research paper (.pdf / .txt) to begin analysis."
     )
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -279,18 +407,48 @@ def render_welcome_state() -> None:
             "Indexes adjacent 3-sentence passages. Queries are mapped to the TF-IDF space and ranked by cosine similarity with out-of-vocabulary protection."
         )
     with col3:
-        st.markdown("#### 3. Academic Baselines")
+        st.markdown("#### 3. Academic Baselines & Dual Reports")
         st.caption(
-            "Evaluates TextRank against Lead-k and Word-Frequency baselines, and compares TF-IDF with exact keyword-match retrieval."
+            "Evaluates TextRank against Lead-k and Word-Frequency baselines, with 1-click forensic PDF and structured JSON exports."
         )
 
 
-def render_metadata_banner(extraction, prep_doc) -> None:
+def render_integrity_and_metadata_banner(extraction, prep_doc, apply_privacy: bool) -> None:
     # Display any extraction warnings (e.g. low-text / scanned PDF alert)
     for warning_msg in extraction.warnings:
         st.warning(f"⚠️ {warning_msg}")
 
-    # Top metrics bar
+    # Explainable review cues banner
+    st.markdown(
+        """
+        <div class="review-cue-box">
+            <strong>🔍 Explainable Diagnostic Review Cues:</strong><br/>
+            • <strong>Extractive Centrality:</strong> TextRank selects verbatim sentences via PageRank ($d=0.85$) over sentence cosine graph. <em>0% hallucination risk.</em><br/>
+            • <strong>Lexical Retrieval:</strong> Passage ranking uses TF-IDF cosine similarity without generative rephrasing.<br/>
+            • <strong>Immutability & Integrity:</strong> Source document treated as immutable session evidence with verified cryptographic digests.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Cryptographic digests bar
+    sha256 = extraction.hashes.get("sha256", "N/A")
+    sha1 = extraction.hashes.get("sha1", "N/A")
+    md5 = extraction.hashes.get("md5", "N/A")
+
+    st.markdown(
+        f"""
+        <div class="integrity-container">
+            <strong>Evidence Identity:</strong> <code>{extraction.filename}</code> ({extraction.raw_size_bytes:,} bytes)<br/>
+            <span class="hash-badge">SHA-256</span> <code>{sha256}</code><br/>
+            <span class="hash-badge">SHA-1</span> <code>{sha1}</code> &nbsp;|&nbsp;
+            <span class="hash-badge">MD5</span> <code>{md5}</code>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Top container metrics bar
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(
@@ -317,7 +475,7 @@ def render_metadata_banner(extraction, prep_doc) -> None:
 
 
 def render_summary_tab(
-    prep_doc, summary_ratio: float, show_baselines: bool, textrank_res
+    prep_doc, summary_ratio: float, show_baselines: bool, textrank_res, lead_res, freq_res
 ) -> None:
     st.subheader("TextRank Extractive Summary")
 
@@ -339,7 +497,7 @@ def render_summary_tab(
         help="Summary sentences extracted using TextRank and restored to original chronological document order.",
     )
 
-    # Download summary button
+    # Download summary markdown button
     download_content = (
         f"# ResearchPaper Lens — Summary\n\n"
         f"**Algorithm:** TextRank (TF-IDF Cosine Graph + PageRank)\n"
@@ -358,9 +516,6 @@ def render_summary_tab(
         st.divider()
         st.markdown("### 📊 Academic Baseline Comparison")
         st.caption("Side-by-side comparison of extractive summarization methods.")
-
-        lead_res = lead_k_summarize(prep_doc.sentences, ratio=summary_ratio)
-        freq_res = word_frequency_summarize(prep_doc.sentences, ratio=summary_ratio)
 
         b_col1, b_col2 = st.columns(2)
         with b_col1:
@@ -434,11 +589,9 @@ def render_retrieval_tab(prep_doc, top_k: int, show_baselines: bool) -> None:
                     )
 
 
-def render_keywords_tab(prep_doc) -> None:
+def render_keywords_tab(prep_doc, keywords) -> None:
     st.subheader("Document Keywords & Term Importance")
-    st.caption("Top 15 salient terms calculated from sentence-level TF-IDF aggregation.")
-
-    keywords = extract_keywords(prep_doc.sentences, count=15)
+    st.caption("Top salient terms calculated from sentence-level TF-IDF aggregation.")
 
     if not keywords:
         st.info("No eligible keyword terms detected.")
@@ -581,6 +734,7 @@ def render_abstractive_tab(prep_doc, textrank_summary: str) -> None:
                     base_url=base_url,
                 )
                 st.session_state["abstractive_result"] = res
+                st.rerun()
             except MissingApiKeyError as e:
                 st.error(f"🔑 Missing API Key: {e}")
             except ModelTimeoutError as e:

@@ -10,8 +10,10 @@ Adheres strictly to the architectural contracts defined in architecture.md:
 
 from __future__ import annotations
 
+import hashlib
 import io
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO, Union
@@ -23,6 +25,8 @@ from pypdf.errors import PdfReadError
 MAX_FILE_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MiB
 MAX_PDF_PAGES: int = 100
 LOW_TEXT_CHARS_PER_PAGE_THRESHOLD: int = 100
+MAX_CHARS_PER_PAGE: int = 100_000
+MAX_TOTAL_CHARS: int = 5_000_000
 
 
 class ExtractionError(Exception):
@@ -42,7 +46,56 @@ class UnsupportedFormatError(ExtractionError):
 
 
 class EmptyDocumentError(ExtractionError):
-    """Raised when an uploaded document contains no readable text."""
+    """Raised when an uploaded document contains no readable text or is 0 bytes."""
+
+
+class CorruptDocumentError(ExtractionError):
+    """Raised when input bitstream is malformed or unreadable."""
+
+
+class DecompressionBombError(ExtractionError):
+    """Raised when extracted document text exceeds safety limits (possible decompression bomb)."""
+
+
+def sanitize_filename(filename: str | None) -> str:
+    """Sanitizes user-supplied filenames for display and file system safety.
+
+    - Strips directory traversal patterns (e.g. ../, ..\\, /, \\)
+    - Strips control characters (ASCII < 32 and 127)
+    - Truncates to a maximum length of 255 characters while preserving extension
+    - Defaults to 'unnamed_document' if empty or purely invalid
+    """
+    if not filename:
+        return "unnamed_document"
+
+    # Remove directory paths / traversal components
+    clean = re.sub(r"[/\\]+", "_", filename)
+    clean = clean.replace("..", "_")
+
+    # Strip control characters and non-printable characters
+    clean = "".join(ch for ch in clean if ord(ch) >= 32 and ord(ch) != 127)
+    clean = clean.strip(". ")
+
+    if not clean:
+        return "unnamed_document"
+
+    # Truncate to 255 characters max, preserving file extension if present
+    if len(clean) > 255:
+        p = Path(clean)
+        ext = p.suffix[:10]  # keep reasonable extension
+        stem = p.stem[: 255 - len(ext)]
+        clean = stem + ext
+
+    return clean or "unnamed_document"
+
+
+def compute_hashes(data: bytes) -> dict[str, str]:
+    """Computes SHA-256, SHA-1, and MD5 cryptographic digests on raw source bytes."""
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "sha1": hashlib.sha1(data).hexdigest(),
+        "md5": hashlib.md5(data).hexdigest(),
+    }
 
 
 @dataclass
@@ -54,6 +107,8 @@ class ExtractionResult:
     char_count: int
     warnings: list[str] = field(default_factory=list)
     filename: str = ""
+    hashes: dict[str, str] = field(default_factory=dict)
+    raw_size_bytes: int = 0
 
 
 def _resolve_source(
@@ -108,7 +163,11 @@ def _resolve_source(
     data = source.read()
     if hasattr(source, "seek"):
         source.seek(pos)
-    return data, resolved_name
+
+    if len(data) == 0:
+        raise EmptyDocumentError("The document is empty (0 bytes).")
+
+    return data, sanitize_filename(resolved_name)
 
 
 def extract_text(
@@ -121,16 +180,21 @@ def extract_text(
         filename: Optional filename hint (especially if source is bytes/stream).
 
     Returns:
-        ExtractionResult containing text, page_count, char_count, and warnings.
+        ExtractionResult containing text, page_count, char_count, hashes, and warnings.
 
     Raises:
         FileTooLargeError: If file exceeds 10 MiB.
         UnsupportedFormatError: If format is not PDF or TXT.
         PageLimitExceededError: If PDF exceeds 100 pages.
-        EmptyDocumentError: If document contains no readable text.
-        ExtractionError: On corrupt data or extraction failure.
+        EmptyDocumentError: If document contains no readable text or is 0 bytes.
+        DecompressionBombError: If extracted text exceeds safe limits.
+        CorruptDocumentError: On corrupt bitstreams.
+        ExtractionError: On unexpected extraction failure.
     """
     data, resolved_name = _resolve_source(source, filename)
+
+    if len(data) == 0:
+        raise EmptyDocumentError("The document is empty (0 bytes).")
 
     lower_name = resolved_name.lower()
     if lower_name.endswith(".txt"):
@@ -156,12 +220,19 @@ def _extract_txt(data: bytes, filename: str) -> ExtractionResult:
     if not text.strip():
         raise EmptyDocumentError("The text file is empty or contains only whitespace.")
 
+    if len(text) > MAX_TOTAL_CHARS:
+        raise DecompressionBombError(
+            f"Text file content ({len(text)} characters) exceeds maximum safety limit of {MAX_TOTAL_CHARS}."
+        )
+
     return ExtractionResult(
         text=text,
         page_count=1,
         char_count=len(text),
         warnings=[],
         filename=filename,
+        hashes=compute_hashes(data),
+        raw_size_bytes=len(data),
     )
 
 
@@ -172,7 +243,7 @@ def _extract_pdf(data: bytes, filename: str) -> ExtractionResult:
         reader = pypdf.PdfReader(stream)
         num_pages = len(reader.pages)
     except (PdfReadError, Exception) as e:
-        raise ExtractionError(f"Corrupt or invalid PDF file: {e}") from e
+        raise CorruptDocumentError(f"Corrupt or invalid PDF file: {e}") from e
 
     if num_pages == 0:
         raise EmptyDocumentError("The PDF contains 0 pages.")
@@ -184,11 +255,23 @@ def _extract_pdf(data: bytes, filename: str) -> ExtractionResult:
 
     warnings: list[str] = []
     page_texts: list[str] = []
+    running_chars = 0
 
     for page_idx, page in enumerate(reader.pages):
         try:
             extracted = page.extract_text() or ""
+            if len(extracted) > MAX_CHARS_PER_PAGE:
+                raise DecompressionBombError(
+                    f"Page {page_idx + 1} extracted text ({len(extracted)} chars) exceeds limit of {MAX_CHARS_PER_PAGE}."
+                )
+            running_chars += len(extracted)
+            if running_chars > MAX_TOTAL_CHARS:
+                raise DecompressionBombError(
+                    f"Total extracted text exceeds maximum safety limit of {MAX_TOTAL_CHARS} characters."
+                )
             page_texts.append(extracted)
+        except DecompressionBombError:
+            raise
         except Exception as e:
             warnings.append(f"Failed to extract text from page {page_idx + 1}: {e}")
 
@@ -209,4 +292,6 @@ def _extract_pdf(data: bytes, filename: str) -> ExtractionResult:
         char_count=len(full_text),
         warnings=warnings,
         filename=filename,
+        hashes=compute_hashes(data),
+        raw_size_bytes=len(data),
     )

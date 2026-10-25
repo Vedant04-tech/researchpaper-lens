@@ -1,0 +1,88 @@
+{
+  "document_metadata": {
+    "filename": "sample_05_academic_paper.pdf",
+    "file_size_bytes": 2594,
+    "hashes": {
+      "sha256": "7b5b89654e23a22c201c460b687016ad0e6a1b6625ea1f4cf48d4d350e1271d8",
+      "sha1": "581a88c7ba9d89049c2331645cb53d32cedab1d1",
+      "md5": "3ad7b3760a10991e614264338bfbd29a"
+    },
+    "page_count": 1,
+    "word_count": 163,
+    "sentence_count": 18,
+    "references_detected": false,
+    "warnings": []
+  },
+  "textrank_summary": {
+    "summary": "A Unified Framework for TextRank Information Retrieval in Academic Literature Dr. A. In this paper, we propose a graph-theoretic approach using sentence centrality over TF-IDF cosine similarity spaces. Graph Formulation: Sentences are represented as vertices in an undirected complete graph.",
+    "ratio": 0.25,
+    "sentence_count": 3,
+    "word_count": 40,
+    "compression_ratio": 24.54,
+    "selected_indices": [
+      0,
+      2,
+      7
+    ]
+  },
+  "baseline_summaries": {
+    "lead_k_summary": "A Unified Framework for TextRank Information Retrieval in Academic Literature Dr. A. Turing, Prof. J. von Neumann — Institute for Advanced Study Abstract: Automatic summarization of scientific literature is essential for accelerating research discovery. In this paper, we propose a graph-theoretic approach using sentence centrality over TF-IDF cosine similarity spaces.",
+    "lead_k_words": 50,
+    "word_frequency_summary": "A Unified Framework for TextRank Information Retrieval in Academic Literature Dr. A. Graph Formulation: Sentences are represented as vertices in an undirected complete graph. Mihalcea, TextRank: Bringing Order into Text, EMNLP 2004.",
+    "word_frequency_words": 32
+  },
+  "keywords": [
+    {
+      "term": "brin",
+      "score": 1.0
+    },
+    {
+      "term": "references",
+      "score": 1.0
+    },
+    {
+      "term": "textrank",
+      "score": 0.8769
+    },
+    {
+      "term": "graph",
+      "score": 0.8366
+    },
+    {
+      "term": "retrieval",
+      "score": 0.7243
+    },
+    {
+      "term": "academic",
+      "score": 0.6399
+    },
+    {
+      "term": "literature",
+      "score": 0.5803
+    },
+    {
+      "term": "order",
+      "score": 0.4219
+    },
+    {
+      "term": "text",
+      "score": 0.4219
+    },
+    {
+      "term": "mihalcea",
+      "score": 0.4219
+    }
+  ],
+  "review_cues": [
+    "Extractive Faithfulness: TextRank extracts verbatim sentences directly from source text (0% hallucination risk).",
+    "Graph Centrality: Vertex importance is determined via PageRank (d=0.85, max_iter=100) over TF-IDF cosine similarities.",
+    "Chronological Ordering: Extracted sentences are strictly restored to their original document sequence.",
+    "Scanned PDF Limitation: Low-text heuristic (< 100 chars/page) flags image-only PDFs where embedded text is minimal.",
+    "Lexical Search Boundary: Passage retrieval uses lexical TF-IDF matching and does not perform neural semantic re-ranking.",
+    "Privacy by Default: Sensitive personal identifiers, emails, and credentials are automatically masked."
+  ],
+  "abstractive_summary": null,
+  "redactions_count": 0,
+  "schema_version": "1.0.0",
+  "generated_at": "2026-10-25T05:11:41.648066+00:00"
+}

@@ -1,0 +1,88 @@
+{
+  "document_metadata": {
+    "filename": "sample_01_clean_baseline.txt",
+    "file_size_bytes": 1649,
+    "hashes": {
+      "sha256": "1a2788428f526fe2d9dd9628bbc0aca43d67b26ad989eadfe0268e550afd45b6",
+      "sha1": "f494e016f7380f3c3eb4e5da70c1eac157e1ff33",
+      "md5": "d4a9522a20134cee4bb01ed823bda6a3"
+    },
+    "page_count": 1,
+    "word_count": 254,
+    "sentence_count": 10,
+    "references_detected": false,
+    "warnings": []
+  },
+  "textrank_summary": {
+    "summary": "The core of the Transformer is the self-attention mechanism that relates different positions of a single sequence in order to compute a representation of the sequence. In our model, we employ multi-head attention to allow the model to jointly attend to information from different representation subspaces at different positions. Multi-head attention consists of several attention layers running in parallel, which allows the model to attend to information from different representation subspaces.",
+    "ratio": 0.25,
+    "sentence_count": 3,
+    "word_count": 71,
+    "compression_ratio": 27.95,
+    "selected_indices": [
+      4,
+      7,
+      8
+    ]
+  },
+  "baseline_summaries": {
+    "lead_k_summary": "Attention mechanisms have become an integral part of compelling sequence modeling and transduction models in various tasks. In this work we propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output. The Transformer allows for significantly more parallelization and can reach a new state of the art in translation quality after being trained for as little as twelve hours on eight P100 GPUs.",
+    "lead_k_words": 77,
+    "word_frequency_summary": "The core of the Transformer is the self-attention mechanism that relates different positions of a single sequence in order to compute a representation of the sequence. In our model, we employ multi-head attention to allow the model to jointly attend to information from different representation subspaces at different positions. Multi-head attention consists of several attention layers running in parallel, which allows the model to attend to information from different representation subspaces.",
+    "word_frequency_words": 71
+  },
+  "keywords": [
+    {
+      "term": "attention",
+      "score": 1.1026
+    },
+    {
+      "term": "sequence",
+      "score": 0.9415
+    },
+    {
+      "term": "different",
+      "score": 0.8646
+    },
+    {
+      "term": "model",
+      "score": 0.8405
+    },
+    {
+      "term": "output",
+      "score": 0.7854
+    },
+    {
+      "term": "information",
+      "score": 0.6818
+    },
+    {
+      "term": "query",
+      "score": 0.6757
+    },
+    {
+      "term": "representation",
+      "score": 0.6537
+    },
+    {
+      "term": "transformer",
+      "score": 0.6233
+    },
+    {
+      "term": "superior",
+      "score": 0.5421
+    }
+  ],
+  "review_cues": [
+    "Extractive Faithfulness: TextRank extracts verbatim sentences directly from source text (0% hallucination risk).",
+    "Graph Centrality: Vertex importance is determined via PageRank (d=0.85, max_iter=100) over TF-IDF cosine similarities.",
+    "Chronological Ordering: Extracted sentences are strictly restored to their original document sequence.",
+    "Scanned PDF Limitation: Low-text heuristic (< 100 chars/page) flags image-only PDFs where embedded text is minimal.",
+    "Lexical Search Boundary: Passage retrieval uses lexical TF-IDF matching and does not perform neural semantic re-ranking.",
+    "Privacy by Default: Sensitive personal identifiers, emails, and credentials are automatically masked."
+  ],
+  "abstractive_summary": null,
+  "redactions_count": 0,
+  "schema_version": "1.0.0",
+  "generated_at": "2026-10-25T05:11:40.910947+00:00"
+}

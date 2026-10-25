@@ -1,0 +1,87 @@
+{
+  "document_metadata": {
+    "filename": "sample_03_edge_case_math.txt",
+    "file_size_bytes": 640,
+    "hashes": {
+      "sha256": "820a772937f19562d2303c49dcb07275dff5125d52081947ab9b3af69c724427",
+      "sha1": "df66aef236285484f1b008a7930d73f802281196",
+      "md5": "0845270ef0ebf4c875a6961eb2dbd880"
+    },
+    "page_count": 1,
+    "word_count": 87,
+    "sentence_count": 6,
+    "references_detected": false,
+    "warnings": []
+  },
+  "textrank_summary": {
+    "summary": "Recent breakthroughs by Dr. Smith et al. in Information Retrieval (i.e. IR systems) have achieved state-of-the-art results on benchmark datasets (e.g. TREC, SQuAD). As illustrated in Fig. 1 and Eq. 2, the error rate dropped to 3.1415 percent.",
+    "ratio": 0.25,
+    "sentence_count": 2,
+    "word_count": 38,
+    "compression_ratio": 43.68,
+    "selected_indices": [
+      0,
+      1
+    ]
+  },
+  "baseline_summaries": {
+    "lead_k_summary": "Recent breakthroughs by Dr. Smith et al. in Information Retrieval (i.e. IR systems) have achieved state-of-the-art results on benchmark datasets (e.g. TREC, SQuAD). As illustrated in Fig. 1 and Eq. 2, the error rate dropped to 3.1415 percent.",
+    "lead_k_words": 38,
+    "word_frequency_summary": "Recent breakthroughs by Dr. Smith et al. in Information Retrieval (i.e. IR systems) have achieved state-of-the-art results on benchmark datasets (e.g. TREC, SQuAD). Furthermore, Prof. Davis demonstrated that subsampling reduces convergence time significantly.",
+    "word_frequency_words": 33
+  },
+  "keywords": [
+    {
+      "term": "dropped",
+      "score": 0.4082
+    },
+    {
+      "term": "error",
+      "score": 0.4082
+    },
+    {
+      "term": "illustrated",
+      "score": 0.4082
+    },
+    {
+      "term": "fig",
+      "score": 0.4082
+    },
+    {
+      "term": "percent",
+      "score": 0.4082
+    },
+    {
+      "term": "rate",
+      "score": 0.4082
+    },
+    {
+      "term": "alpha",
+      "score": 0.378
+    },
+    {
+      "term": "fixed",
+      "score": 0.378
+    },
+    {
+      "term": "particular",
+      "score": 0.378
+    },
+    {
+      "term": "parameter",
+      "score": 0.378
+    }
+  ],
+  "review_cues": [
+    "Extractive Faithfulness: TextRank extracts verbatim sentences directly from source text (0% hallucination risk).",
+    "Graph Centrality: Vertex importance is determined via PageRank (d=0.85, max_iter=100) over TF-IDF cosine similarities.",
+    "Chronological Ordering: Extracted sentences are strictly restored to their original document sequence.",
+    "Scanned PDF Limitation: Low-text heuristic (< 100 chars/page) flags image-only PDFs where embedded text is minimal.",
+    "Lexical Search Boundary: Passage retrieval uses lexical TF-IDF matching and does not perform neural semantic re-ranking.",
+    "Privacy by Default: Sensitive personal identifiers, emails, and credentials are automatically masked."
+  ],
+  "abstractive_summary": null,
+  "redactions_count": 0,
+  "schema_version": "1.0.0",
+  "generated_at": "2026-10-25T05:11:41.447796+00:00"
+}

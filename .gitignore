@@ -27,9 +27,11 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Planning / specification markdown files (only README.md is tracked/posted)
-*.md
-!README.md
+# Internal documentation & agent configuration (never committed to git)
 docs/
-reports/
+.agents/
+
+# Whitelist deliverables and evaluation reports
+!reports/
+!reports/**
 

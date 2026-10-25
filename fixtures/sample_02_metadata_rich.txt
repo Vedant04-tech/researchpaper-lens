@@ -1,0 +1,17 @@
+Graph Neural Networks for Academic Document Analysis
+Abstract
+Information retrieval and natural language processing techniques increasingly utilize graph-based representations for document modeling. In this paper, we evaluate TextRank algorithms applied to technical document segmentation.
+
+1. Introduction
+Academic literature has grown exponentially over the past decade. Researchers face severe information overload when searching and reviewing modern technical publications. Automated extractive summarization provides concise representations of lengthy research papers.
+
+2. Graph-Based Centrality Formulation
+We represent documents as sentence graphs where vertices correspond to individual sentences. Edges between vertices are weighted by lexical similarity calculated via Term Frequency-Inverse Document Frequency (TF-IDF) vectors and cosine similarity. PageRank centrality is subsequently calculated with a damping factor of 0.85 and convergence threshold of 1e-6. Sentences with the highest centrality scores are extracted while preserving original document order.
+
+3. Empirical Results & Discussion
+Our experimental results indicate that TextRank outperforms both Lead-k and frequency-based baselines across technical corpora. Furthermore, passage retrieval achieves a high Mean Reciprocal Rank on academic query benchmarks.
+
+References
+[1] Mihalcea, R. and Tarau, P., 2004. TextRank: Bringing order into text. In EMNLP.
+[2] Page, L., Brin, S., Motwani, R. and Winograd, T., 1999. The PageRank citation ranking.
+[3] Salton, G. and Buckley, C., 1988. Term-weighting approaches in automatic text retrieval. Information Processing & Management, 24(5), pp.513-523.

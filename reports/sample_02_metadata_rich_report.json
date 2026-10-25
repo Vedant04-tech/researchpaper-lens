@@ -1,0 +1,88 @@
+{
+  "document_metadata": {
+    "filename": "sample_02_metadata_rich.txt",
+    "file_size_bytes": 1686,
+    "hashes": {
+      "sha256": "03c37331af3e710a6751d80842a47cc9aa72ecd8307c9112a62bca0b2ce09396",
+      "sha1": "1f46c8466dd0a0d2500409311c6b6f05f7f0c14f",
+      "md5": "36800a85252836d5ad4fb7d8358f4abf"
+    },
+    "page_count": 1,
+    "word_count": 164,
+    "sentence_count": 14,
+    "references_detected": true,
+    "warnings": []
+  },
+  "textrank_summary": {
+    "summary": "Graph Neural Networks for Academic Document Analysis Abstract Information retrieval and natural language processing techniques increasingly utilize graph-based representations for document modeling. In this paper, we evaluate TextRank algorithms applied to technical document segmentation. Graph-Based Centrality Formulation We represent documents as sentence graphs where vertices correspond to individual sentences.",
+    "ratio": 0.25,
+    "sentence_count": 3,
+    "word_count": 49,
+    "compression_ratio": 29.88,
+    "selected_indices": [
+      0,
+      1,
+      7
+    ]
+  },
+  "baseline_summaries": {
+    "lead_k_summary": "Graph Neural Networks for Academic Document Analysis Abstract Information retrieval and natural language processing techniques increasingly utilize graph-based representations for document modeling. In this paper, we evaluate TextRank algorithms applied to technical document segmentation. Introduction Academic literature has grown exponentially over the past decade.",
+    "lead_k_words": 44,
+    "word_frequency_summary": "Graph Neural Networks for Academic Document Analysis Abstract Information retrieval and natural language processing techniques increasingly utilize graph-based representations for document modeling. In this paper, we evaluate TextRank algorithms applied to technical document segmentation. Graph-Based Centrality Formulation We represent documents as sentence graphs where vertices correspond to individual sentences.",
+    "word_frequency_words": 49
+  },
+  "keywords": [
+    {
+      "term": "document",
+      "score": 1.0005
+    },
+    {
+      "term": "centrality",
+      "score": 0.7979
+    },
+    {
+      "term": "technical",
+      "score": 0.7477
+    },
+    {
+      "term": "academic",
+      "score": 0.7144
+    },
+    {
+      "term": "graph",
+      "score": 0.6613
+    },
+    {
+      "term": "frequency",
+      "score": 0.646
+    },
+    {
+      "term": "based",
+      "score": 0.6144
+    },
+    {
+      "term": "sentences",
+      "score": 0.5773
+    },
+    {
+      "term": "textrank",
+      "score": 0.5571
+    },
+    {
+      "term": "calculated",
+      "score": 0.5295
+    }
+  ],
+  "review_cues": [
+    "Extractive Faithfulness: TextRank extracts verbatim sentences directly from source text (0% hallucination risk).",
+    "Graph Centrality: Vertex importance is determined via PageRank (d=0.85, max_iter=100) over TF-IDF cosine similarities.",
+    "Chronological Ordering: Extracted sentences are strictly restored to their original document sequence.",
+    "Scanned PDF Limitation: Low-text heuristic (< 100 chars/page) flags image-only PDFs where embedded text is minimal.",
+    "Lexical Search Boundary: Passage retrieval uses lexical TF-IDF matching and does not perform neural semantic re-ranking.",
+    "Privacy by Default: Sensitive personal identifiers, emails, and credentials are automatically masked."
+  ],
+  "abstractive_summary": null,
+  "redactions_count": 0,
+  "schema_version": "1.0.0",
+  "generated_at": "2026-10-25T05:11:41.264341+00:00"
+}
